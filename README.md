@@ -1,1 +1,5 @@
-# Climate-Data-Processing-for-Spatiotemporal-Analysis
+# Had-UK-Grid Data Processing
+
+This R script allows you to extract and restructure NetCDF files from the MetOffice Had-UK-Grid dataset. The main function, restructure_nc, is responsible for reading NetCDF files, extracting relevant data (climate data and coordinates), transforming it into a tidy format, and preparing it for further analysis. The script processes all .nc files in a specified directory, combines them, and outputs a data frame where each column represents a specific time period (YYMMDD) for tasmax values.
+
+The input files are expected to be .nc (NetCDF) files located in the specified directory you choose. Each file should contain climate data (in this example maximum air temperature) and metadata such as latitude, longitude, and time. The output will be a single data frame (output) where each row corresponds to a geographical coordinate (projection_x_coordinate, projection_y_coordinate) and each column corresponds to a date (YYMMDD). The values represent the climate data for that coordinate and date.
