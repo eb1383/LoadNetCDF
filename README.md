@@ -25,7 +25,7 @@ This script is all about loading and processing NetCDF files that contain daily 
 
 ---
 
-## 2. **agg_climate_df.R Suvrveillance and Temperature Data Integration** 🔥🦠
+## 2. **agg_climate_df.R - Surveillance and Temperature Data Integration** 🔥🦠
 
 This script takes surveillance case data and combines it with the temperature data you processed above. It does all the heavy lifting, like preparing time-series data, aggregating by week, and aligning with geographical boundaries (LSOAs).
 
