@@ -1,4 +1,4 @@
-# README for Temperature and Case Data Processing Scripts 🌡️📊
+# Temperature and Case Data Processing Scripts 🌡️📊
 
 Welcome to the repository! Here, you'll find two R scripts designed to process gridded temperature data and surveillance case data, which can be used to explore potential relationships between temperature and case counts. Below is a friendly guide on what each script does and how to use them.
 
