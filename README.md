@@ -75,3 +75,37 @@ You can install the required packages using this line of code in R:
 install.packages(c("tidync", "tidyverse", "purrr", "ncdf4", "tsibble", 
                    "readxl", "sf", "janitor", "raster", "terra", "exactextractr", 
                    "lubridate", "dlnm", "gnm"))
+```
+
+## 🚀 How to Use  
+
+To run these scripts, follow these steps:  
+
+1. **Install the required R packages** as listed above.  
+2. **Update file paths**:  
+   - In `LoadNetCDF_tasmax.R`, update the path to where your NetCDF files are stored.  
+   - In the case data script, update the paths to your case data file and LSOA shapefile.  
+3. **Run the scripts**:  
+   - Start by running the temperature data processing script (`LoadNetCDF_tasmax.R`).  
+   - Then run the case data script to integrate the case data with temperature.  
+4. **Ready for analysis**:  
+   - You’ll have a beautifully merged dataset of case counts and temperatures at the LSOA level, ready for modelling or further exploration.  
+
+---
+
+## 🧑‍💻 Example Output  
+
+Here’s what the final dataset will look like:  
+
+- **LSOA Code**: Unique identifiers for each Lower Super Output Area (LSOA).  
+- **Week Number**: Continuous weekly index (we’ve made sure no weeks are skipped!).  
+- **Total Case Count**: Aggregated cases for each LSOA per week.  
+- **Average Temperature**: Area-weighted mean temperature for each LSOA, aggregated by week.  
+
+---
+
+## 🤝 Contributions  
+
+Feel free to contribute! If you find any bugs or have cool ideas for improvements, please submit an issue or create a pull request. I'd love to make this better together! ✨  
+
+
