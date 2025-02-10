@@ -1,101 +1,98 @@
-# libraries
-library(tidyverse)
-library(readxl)
-library(sf)
-library(janitor)  
-library(raster)
-library(patchwork)
-library(exactextractr)
-library(data.table)
-library(terra)
-library(dlnm)
-library(gnm)
-
+# Load required libraries
+library(tidyverse)   # Data manipulation
+library(readxl)      # Read Excel files
+library(sf)          # Spatial data handling
+library(janitor)     # Data cleaning
+library(raster)      # Raster data processing
+library(patchwork)   # Plot arrangements
+library(exactextractr) # Spatial extraction
+library(data.table)  # Fast data manipulation
+library(terra)       # Raster data handling (modern alternative to raster)
+library(dlnm)        # Distributed lag non-linear models
+library(gnm)         # Generalized nonlinear models
+library(lubridate)   # Date handling
 
 ### PREPARE THE TIME SERIES DATA ####
-# location of case data
-source <- ""
-# file name
-file <- paste0("")
-# load surveillance data
-cases <- read_csv(paste0(source, file))
-# subset data frame
-cases <- cases %>%
-  dplyr::select(date, lsoa, count)
-# convert date 
-cases$date <- as.Date(cases$date)
 
-# sequence of dates
+# Define source location and file name
+source <- ""  # Specify data directory
+file <- ""    # Specify file name
+
+# Load surveillance data (cases dataset)
+cases <- read_csv(file.path(source, file)) %>%
+  select(date, lsoa, count) %>%  # Select relevant columns
+  mutate(date = as.Date(date))   # Convert date column to Date format
+
+# Define study period (start and end dates)
 start_date <- as.Date("2014-01-01")
 end_date <- as.Date("2021-12-31")
+
+# Create a complete sequence of daily dates
 seqdate <- seq(start_date, end_date, by = "days")
-# filter dataset to match hadukgrid
-cases <- cases %>%
-  filter(date >= start_date & date <= end_date)
-# complete the data by filling in missing dates with zero cases
-cases <- cases %>%
-  complete(nesting(lsoa), date = seq(start_date, end_date, by = "day"), fill = list(count = 0))
-# fill with 0 when no cases
-cases[is.na(cases)] <- 0
 
-### WEEKLY DATA ####
-# create week column
-cases$week <- lubridate::week(cases$date)
-# replace week 53 with week 52
-cases$week <- ifelse(cases$week == 53, 52, cases$week)
-# create continuous week column
-cases$week <- with(cases, (year(date) - min(year(date))) * 52 + week - min(week) + 1)
-# aggregate counts per week
+# Filter cases dataset to only include relevant date range
 cases <- cases %>%
-  group_by(lsoa, week) %>%
-  summarize(total_count = sum(count))
+  filter(date >= start_date & date <= end_date) %>%
+  complete(nesting(lsoa), date = seqdate, fill = list(count = 0)) %>%  # Fill missing dates with zero cases
+  replace_na(list(count = 0))  # Ensure no missing values remain
 
-### LOAD LSOA FILES AND GRIDDED MAX TEMP DATA ####
-# location of shapefiles
-source <- ""
-# file name  
-file <- paste0("LSOA_2011_EW_BGC_V3")
-# load files in R
-shp <- st_read(paste0(source, file, ".shp"))
-# sequences of lsoas
+### AGGREGATE DATA TO WEEKLY LEVEL ####
+
+cases <- cases %>%
+  mutate(
+    week = week(date),  # Extract week number from date
+    week = ifelse(week == 53, 52, week),  # Adjust week 53 to week 52 (standardization)
+    year_offset = (year(date) - min(year(date))) * 52,  # Calculate year offset for continuous week numbering
+    continuous_week = year_offset + week - min(week) + 1  # Create a continuous week index
+  ) %>%
+  group_by(lsoa, continuous_week) %>%
+  summarise(total_count = sum(count), .groups = "drop")  # Aggregate case counts by week
+
+### LOAD LSOA SHAPEFILE ####
+
+# Define source location and file name for shapefile
+file <- "LSOA_2011_EW_BGC_V3"
+
+# Load LSOA shapefile (Lower Super Output Areas)
+shp <- st_read(file.path(source, paste0(file, ".shp")))
+
+# Extract unique LSOA codes
 seqlsoa <- shp %>%
   distinct(LSOA11CD)
 
-### LOAD GRIDDED MAX TEMP DATA ####
-source("LoadNetCDF_tasmax.R")
-# clean names
-output <- output %>% 
-  clean_names()
-# convert tasmax data to spat raster
-output <- rast(output)
-# compute the area weighted average of cells intersecting each lsoa
-lsoa <- exact_extract(output, shp, fun = "mean")
-# set dimnames
-dimnames(lsoa) <- list(seqlsoa$LSOA11CD, seqdate)
-lsoa <- lsoa %>%
-  rownames_to_column(var = "lsoa")
-# reshape the data frame to a long format
-lsoa_long <- lsoa %>%
-  pivot_longer(cols = -lsoa, names_to = "date", values_to = "total_tasmax")
-# convert the date column to date format
-lsoa_long <- lsoa_long %>%
-  mutate(date = as.Date(date))
-# add the week column to store the week number
-lsoa_long <- lsoa_long %>%
-  mutate(week = lubridate::week(date))
-# replace week 53 with week 52
-lsoa_long$week <- ifelse(lsoa_long$week == 53, 52, lsoa_long$week)
-# create continuous week column
-lsoa_long$week <- with(lsoa_long, (year(date) - min(year(date))) * 52 + week - min(week) + 1)
-# aggregate the data by week
-lsoa <- lsoa_long %>%
-  group_by(lsoa, week) %>%
-  summarise(average_tasmax = mean(total_tasmax))
+### LOAD AND PROCESS GRIDDED MAX TEMPERATURE DATA ####
 
-# merge with main dataset
-df <- merge(cases, lsoa, by = c("lsoa", "week"), all = T)
-df$average_tasmax[is.na(df$average_tasmax)] <- 0
-df$total_count[is.na(df$total_count)] <- 0
+# Load NetCDF temperature data processing script
+source("LoadNetCDF_tasmax.R")
+
+# Clean column names in the loaded dataset
+output <- output %>%
+  clean_names() %>%
+  rast()  # Convert data to a raster format for spatial processing
+
+# Compute area-weighted mean temperature for each LSOA
+lsoa <- exact_extract(output, shp, fun = "mean") %>%
+  as.data.frame() %>%  # Convert extracted data to a data frame
+  setNames(c("lsoa", seqdate)) %>%  # Assign column names
+  pivot_longer(cols = -lsoa, names_to = "date", values_to = "average_tasmax") %>%  # Convert to long format
+  mutate(date = as.Date(date))  # Ensure date column is in Date format
+
+# Aggregate temperature data to weekly level
+lsoa <- lsoa %>%
+  mutate(
+    week = week(date),  # Extract week number
+    week = ifelse(week == 53, 52, week),  # Standardize week numbering
+    year_offset = (year(date) - min(year(date))) * 52,  # Compute year-based offset for continuous week numbering
+    continuous_week = year_offset + week - min(week) + 1  # Create continuous week index
+  ) %>%
+  group_by(lsoa, continuous_week) %>%
+  summarise(average_tasmax = mean(average_tasmax, na.rm = TRUE), .groups = "drop")  # Aggregate to weekly level
+
+### MERGE CASE DATA WITH TEMPERATURE DATA ####
+
+df <- full_join(cases, lsoa, by = c("lsoa", "continuous_week")) %>%
+  replace_na(list(average_tasmax = 0, total_count = 0))  # Fill missing values with zeros
+
 
 
 
